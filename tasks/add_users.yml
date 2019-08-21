@@ -1,0 +1,30 @@
+- name: Check if passwd file exists
+  stat:
+    path: "{{ squid_config_dir }}/passwd"
+    get_checksum: False
+  register: _squid_passwd_file
+
+- name: create user passwd file
+  file:
+    path: "{{ squid_config_dir }}/passwd"
+    state: touch
+    mode: 0640
+    owner: proxy
+    group: proxy
+  when: not _squid_passwd_file.stat.exists
+
+- name: add python-passlib for password file creation
+  package: name=python-passlib state=present
+
+- name: add squid users
+  no_log: True
+  htpasswd:
+    path: "{{ squid_config_dir }}/passwd"
+    name: "{{ item.username }}"
+    password: "{{ item.password }}"
+    owner: root
+    group: proxy
+    mode: 0640
+  with_items:
+  - "{{ squid_users }}"
+  notify: restart squid

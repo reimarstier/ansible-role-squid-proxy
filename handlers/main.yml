@@ -1,0 +1,21 @@
+---
+- name: restart squid
+  service: name={{squid_service_name}} state=restarted
+
+- name: "Wait for squid to start"
+  wait_for:
+    port: "{{ squid_public_ports[0] }}"
+    timeout: 60
+    host: 0.0.0.0
+  listen: "restart squid"
+
+- name: check if all ports are bound
+  shell: "netstat -nltp | grep -E '[0-9]+/.*squid.*$' | grep {{item}}"
+  loop: "{{ squid_public_ports }}"
+  register: result
+  changed_when: False
+  failed_when: result.rc != 0
+  until: result.rc == 0
+  retries: 5
+  delay: 5
+  listen: "restart squid"

@@ -1,0 +1,10 @@
+---
+- import_tasks: setup.yml
+- import_tasks: add_users.yml
+  when: squid_users is defined
+
+- name: Flush handlers (restart squid) in case any configs have changed.
+  meta: flush_handlers
+
+- import_tasks: checks.yml
+

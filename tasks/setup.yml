@@ -1,0 +1,45 @@
+- name: show os
+  debug: msg="{{ansible_distribution }} {{ ansible_distribution_major_version }}"
+
+- name: gather os specific variables
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution }}-{{ ansible_distribution_major_version}}.yml"
+    - "{{ ansible_distribution }}.yml"
+  tags: vars
+
+- name: updating APT cache and installing squid3
+  apt: name=squid3 state=latest update_cache=yes
+  tags: squid
+  when: apt_no_download is undefined or not apt_no_download
+
+- name: check if ncsa_auth file can be found
+  stat:
+    path: "{{ squid_auth_helper }}"
+  register: squid_ncsa_auth_helper
+
+- name: setting up the squid3 configuration file
+  template: src={{squid_service_template}} dest={{squid_config_dir}}/squid.conf owner=root group=root
+  notify: restart squid
+  tags: squid
+
+- name: Firewall allow proxy port
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+  loop: "{{ squid_public_ports }}"
+
+- name: Check if custom access log file exists
+  stat:
+    path: "/var/log/{{ squid_service_name }}/access_custom.log"
+    get_checksum: False
+  register: _squid_custom_log
+
+- name: Create custom access log file
+  file:
+    path: "/var/log/{{ squid_service_name }}/access_custom.log"
+    state: touch
+    mode: 0640
+    owner: proxy
+    group: proxy
+  when: squid_custom_logging and not _squid_custom_log.stat.exists

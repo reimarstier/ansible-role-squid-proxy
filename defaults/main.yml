@@ -1,0 +1,20 @@
+squid_config_dir: "/etc/squid"
+squid_service_name: "squid"
+squid_service_template: "squid.conf.j2"
+
+squid_custom_logging: True
+
+squid_bind_ports: ["3128"]
+squid_public_ports: ["3128"]  # open firewall at this ports
+squid_parents: []
+squid_ip: "{{ ansible_default_ipv4.address }}"
+squid_local_networks: []
+squid_never_direct: "{{ squid_parents | length > 0 }}"
+
+squid_block_access_to_private_networks:
+- name: vpn
+  subnet: "10.0.0.0/8"
+- name: localnet
+  subnet: "127.0.0.0/8"
+- name: docker
+  subnet: "172.16.0.0/12"

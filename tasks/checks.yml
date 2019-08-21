@@ -1,0 +1,27 @@
+#- name: check proxy access uri module
+#  #delegate_to: localhost
+#  #no_log: True
+#  uri:
+#    url: http://example.com
+#    status_code: 200
+#  register: result
+#  environment:
+#    http_proxy: "http://{{ item.username }}:{{ item.password }}@{{ ansible_default_ipv4.address }}:{{ squid_port }}"
+#  with_items:
+#  - "{{ squid_users }}"
+#
+#- debug: msg="{{ result }}"
+
+- name: check proxy access from localhost
+  delegate_to: localhost
+  become: false
+  shell: >
+    curl --max-time 10 -x {{ squid_ip }}:{{ squid_public_ports[0] }}
+    -U {{ item.username }}:{{ item.password }} http://example.com
+  args:
+    warn: False
+  no_log: True
+  changed_when: False
+  with_items:
+  - "{{ squid_users }}"
+  when: squid_users is defined

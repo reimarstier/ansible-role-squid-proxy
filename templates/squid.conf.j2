@@ -1,0 +1,100 @@
+###########################################################################
+# SQUID3 squid.conf
+###########################################################################
+
+###########################################################################
+# authentication
+###########################################################################
+# squid authentication helper program path
+# dpkg -L squid3 | grep ncsa_auth
+auth_param basic program {{ squid_auth_helper }} {{ squid_config_dir }}/passwd
+auth_param basic children 5
+auth_param basic realm Squid proxy-caching web server
+auth_param basic credentialsttl 2 hours
+auth_param basic casesensitive off
+
+acl authenticated proxy_auth REQUIRED
+
+###########################################################################
+acl SSL_ports port 443
+acl Safe_ports port 80        # http
+acl Safe_ports port 21        # ftp
+acl Safe_ports port 443        # https
+acl Safe_ports port 70        # gopher
+acl Safe_ports port 210        # wais
+acl Safe_ports port 1025-65535    # unregistered ports
+acl Safe_ports port 280        # http-mgmt
+acl Safe_ports port 488        # gss-http
+acl Safe_ports port 591        # filemaker
+acl Safe_ports port 777        # multiling http
+acl CONNECT method CONNECT
+
+# allow this proxy to be used locally
+acl localhost src 127.0.0.0/8
+http_access allow localhost
+{% for local_net in squid_local_networks %}
+acl {{ local_net.name }} src {{ local_net.net }}
+http_access allow {{ local_net.name }}
+{% endfor %}
+
+# block access to private networks
+{% for network in squid_block_access_to_private_networks %}
+acl {{ network['name'] }} dst {{ network['subnet'] }}
+http_access deny {{ network['name'] }}
+{% endfor %}
+
+# access control
+http_access allow authenticated
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+
+# port configuration
+{% for port in squid_bind_ports %}
+http_port {{ port }}
+{% endfor %}
+
+###########################################################################
+# disable ipv6 dns resolution (prefer ipv4)
+dns_v4_first on
+
+###########################################################################
+# Anonymous Proxy Settings
+###########################################################################
+# https://www.cyberciti.biz/faq/squid-proxy-is-not-hiding-client-ip-address/
+# Hide client ip #
+forwarded_for delete
+# Turn off via header #
+via off
+# Deny request for original source of a request
+follow_x_forwarded_for deny all
+# See below
+request_header_access X-Forwarded-For deny all
+
+###########################################################################
+# Logging Format (intentional newlines in jinja template)
+###########################################################################
+logformat nourl {% raw %} %{%Y/%m/%d %H:%M:%S}tl %6tr %>a %Ss/%03>Hs %<st %[un %Sh/%<a %mt {% endraw %}
+
+logformat combined {% raw %} %{%Y/%m/%d %H:%M:%S}tl %>a %un "%rm %ru HTTP/%rv" %>Hs %<st "%{Referer}>h" "%{User-Agent}>h" %Ss:%Sh {% endraw %}
+
+###########################################################################
+{% if squid_custom_logging %}
+# anonymous logging (no target url, only source ip for fail2ban)
+access_log daemon:/var/log/{{ squid_service_name }}/access_custom.log nourl
+{% else %}
+access_log daemon:/var/log/{{ squid_service_name }}/access.log combined
+{% endif %}
+
+{% for parent in squid_parents %}
+# {{ parent.name }}
+cache_peer {{ parent.destination }} parent {{ parent.port }} 0 no-query default {{ parent.options | default() }} name={{ parent.name }}
+{% endfor %}
+
+{% if squid_never_direct %}
+# to force the use of a parent proxy for all requests
+# http://www.squid-cache.org/Doc/config/never_direct/
+never_direct allow all
+{% endif %}
+
+# disable caching
+cache deny all

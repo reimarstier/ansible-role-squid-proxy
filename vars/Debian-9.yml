@@ -1,0 +1,5 @@
+---
+squid_config_dir: "/etc/squid"
+squid_service_name: "squid"
+squid_auth_helper: "/usr/lib/squid/basic_ncsa_auth"
+
